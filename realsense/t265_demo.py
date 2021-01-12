@@ -112,7 +112,7 @@ try:
     # Configure the OpenCV stereo algorithm. See
     # https://docs.opencv.org/3.4/d2/d85/classcv_1_1StereoSGBM.html for a
     # description of the parameters
-    window_size = 5
+    window_size = 10# 5
     min_disp = 0
     # must be divisible by 16
     num_disp = 112 - min_disp
@@ -162,7 +162,7 @@ try:
     #     \   |   /
     #      \ fov /
     #        \|/
-    stereo_fov_rad = 90 * (pi/180)  # 90 degree desired fov
+    stereo_fov_rad = 60 * (pi/180)  # 90 degree desired fov
     stereo_height_px = 300          # 300x300 pixel stereo output
     stereo_focal_px = stereo_height_px/2 / tan(stereo_fov_rad/2)
 
@@ -187,6 +187,7 @@ try:
                        [0,               0,         1, 0]])
     P_right = P_left.copy()
     P_right[0][3] = T[0]*stereo_focal_px
+    b_f=T[0]*stereo_focal_px
 
     # Construct Q for use with cv2.reprojectImageTo3D. Subtract max_disp from x
     # since we will crop the disparity later
@@ -234,12 +235,42 @@ try:
 
             # re-crop just the valid part of the disparity
             disparity = disparity[:,max_disp:]
+            
+           
 
             isMedian=1
             median=3
             if isMedian:
                 disparity=cv2.medianBlur(disparity,median)
-            # print(disparity)
+            # print("disparity:",disparity)
+            # print("type of disparity",type(disparity))
+            # print("dtype of disparity",disparity.dtype)
+            # print("shape of disparity",disparity.shape)
+            
+            '''
+            Convert the disparity to depth
+            '''
+            conf=stereo_height_px*stereo_height_px
+            [rows,cols]=disparity.shape
+            depth=np.empty(disparity.shape,dtype=float)
+            for i in range(rows):
+                for j in range(cols):
+                    if(disparity[i][j]==1 or disparity[i][j]<0.02):
+                       depth[i][j]=0
+                    else:
+                       depth[i][j]=-b_f/disparity[i][j]
+                       if depth[i][j]<0.5:
+                           depth[i][j]=0
+                    if(depth[i][j]>0 and depth[i][j]<1.5):
+                        conf=conf-1
+                    # print("depth is :",depth[i][j])
+            if (conf<58500):
+                print("Attention!!!There exists obstacle.")
+            print("confidence:",conf)
+            
+            
+
+            
             # input()
 
             # convert disparity to 0-255 and color it
