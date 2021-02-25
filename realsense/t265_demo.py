@@ -32,6 +32,9 @@ import pyrealsense2 as rs
 import cv2
 import numpy as np
 from math import tan, pi
+import time
+# import numpngw
+# import png
 
 """
 In this section, we will set up the functions that will translate the camera
@@ -115,7 +118,7 @@ try:
     window_size = 10# 5
     min_disp = 0
     # must be divisible by 16
-    num_disp = 112 - min_disp
+    num_disp = 112 - min_disp 
     max_disp = min_disp + num_disp
     stereo = cv2.StereoSGBM_create(minDisparity = min_disp,
                                    numDisparities = num_disp,
@@ -211,9 +214,10 @@ try:
         frame_mutex.acquire()
         valid = frame_data["timestamp_ms"] is not None
         frame_mutex.release()
-
+        
         # If frames are ready to process
         if valid:
+            start=time.time()
             # Hold the mutex only long enough to copy the stereo frames
             frame_mutex.acquire()
             frame_copy = {"left"  : frame_data["left"].copy(),
@@ -250,36 +254,52 @@ try:
             '''
             Convert the disparity to depth
             '''
-            conf=stereo_height_px*stereo_height_px
+            # conf=stereo_height_px*stereo_height_px
             [rows,cols]=disparity.shape
             depth=np.empty(disparity.shape,dtype=float)
-            for i in range(rows):
-                for j in range(cols):
-                    if(disparity[i][j]==1 or disparity[i][j]<0.02):
-                       depth[i][j]=0
-                    else:
-                       depth[i][j]=-b_f/disparity[i][j]
-                       if depth[i][j]<0.5:
-                           depth[i][j]=0
-                    if(depth[i][j]>0 and depth[i][j]<1.5):
-                        conf=conf-1
-                    # print("depth is :",depth[i][j])
-            if (conf<58500):
-                print("Attention!!!There exists obstacle.")
-            print("confidence:",conf)
+            # for i in range(rows):
+            #     for j in range(cols):
+            #         if(disparity[i][j]==1 or disparity[i][j]<0.02):
+            #            depth[i][j]=0
+            #         else:
+            #            depth[i][j]=-b_f/disparity[i][j]
+            #            if depth[i][j]<0.5:
+            #                depth[i][j]=0
+            #         if(depth[i][j]>0 and depth[i][j]<1.5):
+            #             conf=conf-1
+            #         # print("depth is :",depth[i][j])
+            # if (conf<58500):
+            #     print("Attention!!!There exists obstacle.")
+            # print("confidence:",conf)
             
-            
-
-            
+            depth=-b_f/disparity
+            # print(depth)
             # input()
-
+            
             # convert disparity to 0-255 and color it
             disp_vis = 255*(disparity - min_disp)/ num_disp
             disp_color = cv2.applyColorMap(cv2.convertScaleAbs(disp_vis,1), cv2.COLORMAP_JET)
             color_image = cv2.cvtColor(center_undistorted["left"][:,max_disp:], cv2.COLOR_GRAY2RGB)
+            end=time.time()
+            
+            # convert depth to 0-255 and color it
+            depth_vis=255*(depth-min_disp)/num_disp
+            depth_color=cv2.applyColorMap(cv2.convertScaleAbs(depth,1),cv2.COLORMAP_JET)
+            # color_image = cv2.cvtColor(center_undistorted["left"][:,max_disp:], cv2.COLOR_GRAY2RGB)
+
+
+
+            seconds=end-start
+            fps=1/seconds
+            
+            fps=str(int(fps))
+            font = cv2.FONT_HERSHEY_SIMPLEX 
+
+            cv2.putText(color_image,fps,(7,70), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
+
 
             if mode == "stack":
-                cv2.imshow(WINDOW_TITLE, np.hstack((color_image, disp_color)))
+                cv2.imshow(WINDOW_TITLE, np.hstack((color_image, depth_color)))
             if mode == "overlay":
                 ind = disparity >= min_disp
                 color_image[ind, 0] = disp_color[ind, 0]
